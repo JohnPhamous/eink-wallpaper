@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>com.phamous.eink-wallpaper.calendar-reader</string>
+  <key>CFBundleName</key>
+  <string>Eink Calendar Reader</string>
+  <key>CFBundleExecutable</key>
+  <string>eink-calendar-reader</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>NSCalendarsFullAccessUsageDescription</key>
+  <string>Create a private daily artwork from events already available in Calendar on this Mac.</string>
+</dict>
+</plist>

@@ -1,0 +1,160 @@
+# Eink Wallpaper
+
+A private, text-free daily artwork for a powered Waveshare ESP32-S3 PhotoPainter. It reads the calendars already connected to macOS Calendar plus Seattle weather, asks an LLM to art-direct the day, generates one bichon-led scene, converts it to the display’s native six-color format, and pushes it over the local network.
+
+No Glanceboard, server, custom firmware, Swift helper, or macOS app is involved. One TypeScript CLI runs from a per-user LaunchAgent at 5:30am.
+
+## What it produces
+
+- One full-bleed 800×480 landscape scene.
+- Exactly one character: a white fluffy bichon with a subtle cobalt-blue collar.
+- No text, clocks, logos, UI, panels, people, or other creatures.
+- A warm, sophisticated animation-inspired language: reduced line density, fluid motion, pastel-futuristic gradients, and dimensional environmental texture.
+- Personal events outrank work; unusual events outrank routine ones; severe weather can override the calendar.
+- Native 16:9 model generation, center-cropped by only 3.125% per side to the display’s 5:3 frame.
+
+The full-color original, six-color preview, exact BMP, sanitized creative brief, QA result, and manifest are archived. Raw calendar payloads exist only in memory during a run.
+
+## Requirements
+
+- macOS with Node.js 22 or later.
+- Work and personal accounts visible in macOS Calendar.
+- One-time macOS Calendar full-access approval for the read-only EventKit CLI.
+- A Vercel AI Gateway key with access to `google/gemini-3.1-flash-image`.
+- Current Waveshare factory firmware in Mode 2 STA, continuously USB-powered.
+- A DHCP reservation for the PhotoPainter. mDNS is used only as fallback.
+
+## Install
+
+```sh
+npm install
+npm run build
+npm link
+```
+
+Build the small local EventKit reader, then configure the reserved display address:
+
+```sh
+npm run build:calendar
+eink-wallpaper setup \
+  --display-host DISPLAY_RESERVED_IP \
+  --weather-contact CONTACT_EMAIL_OR_URL \
+  --weather-latitude HOME_LATITUDE \
+  --weather-longitude HOME_LONGITUDE \
+  --exclude-calendars "TEAM_CALENDAR,BIRTHDAYS" \
+  --exclude-event-prefixes "HOUSEHOLD_MEMBER" \
+  --work-source-matchers "COMPANY_DOMAIN"
+```
+
+Store the Gateway key using hidden terminal input:
+
+```sh
+eink-wallpaper set-gateway-key
+```
+
+Authorize the local Calendar reader once:
+
+```sh
+eink-wallpaper authorize local
+```
+
+EventKit reads recurring instances from the local Calendar store. Calendar names and event-title prefixes in the configured exclusion lists are discarded before normalization. Coordinates, calendar filters, source matchers, the display address, and the NWS contact stay in the untracked local configuration. The Gateway key is stored as a generic password in the login Keychain under `com.phamous.eink-wallpaper`; configuration contains no credentials.
+
+## Prepare the PhotoPainter
+
+1. Update to current factory firmware and synchronize its SD-card assets if the shipped firmware predates STA image uploads.
+2. Enter Mode 2 and connect to the default `esp_network` access point.
+3. Open `http://192.168.4.1/index.html`, configure STA with the trusted home/IoT Wi-Fi, and restart.
+4. Reserve the display’s address in the router and use it during `setup`.
+5. Keep the frame powered. Do not port-forward it; factory `/dataUP` is unauthenticated HTTP.
+
+The CLI reproduces Waveshare’s protocol exactly: 800×480, six exact colors, Floyd–Steinberg diffusion, uncompressed bottom-up 24-bit BMP, a leading `0x01` STA byte, and an `application/octet-stream` POST to `/dataUP`.
+
+## First run
+
+Check credentials, calendar access, weather, and the display without generating an image:
+
+```sh
+eink-wallpaper doctor
+```
+
+Generate an archived candidate without changing the frame:
+
+```sh
+eink-wallpaper generate --no-upload
+```
+
+Generate and publish:
+
+```sh
+eink-wallpaper generate --force
+```
+
+Install the daily LaunchAgent only after the manual run succeeds:
+
+```sh
+eink-wallpaper install-agent
+```
+
+The agent runs while the user is logged in. A calendar interval missed during sleep normally runs after wake; logout, reboot before login, or a closed sleeping laptop can delay the edition.
+
+## Commands
+
+```text
+eink-wallpaper status
+eink-wallpaper doctor
+eink-wallpaper generate [--no-upload] [--force]
+eink-wallpaper regenerate [--new-concept] [--no-upload]
+eink-wallpaper upload ./display.bmp
+eink-wallpaper restore YYYY-MM-DD
+eink-wallpaper bakeoff
+eink-wallpaper set-image-model google/gemini-3.1-flash-image
+eink-wallpaper install-agent
+eink-wallpaper kick
+eink-wallpaper uninstall-agent
+```
+
+`regenerate` retains the day’s chosen concept but asks for another composition. `regenerate --new-concept` asks for a different eligible anchor or metaphor. Every rejected and accepted attempt remains archived, and accepted concepts, compositions, and palettes influence a 30-day novelty ledger.
+
+The configured image model defaults to Gemini. A different AI Gateway image slug can be selected explicitly, but do not send private calendar context to a provider unless its Gateway route satisfies the desired ZDR and training policy.
+
+Every model request explicitly requires Gateway `zeroDataRetention` and `disallowPromptTraining` in addition to the team setting. Requests fail closed when no compliant provider route is available.
+
+`bakeoff` creates 12 anonymized A/B pairs from synthetic scenarios, so it sends no calendar information to the challenger. Open `index.html` and score the displayed six-color results before inspecting `answers.json`. It generates 24 images and never uploads them to the frame.
+
+## Storage
+
+```text
+~/Library/Application Support/Eink Wallpaper/
+  config.json
+  state.json
+  latest.bmp
+  latest.png
+  latest-original.png
+  archives/YYYY-MM-DD/<run-id>/
+  cache/
+
+~/Library/Logs/Eink Wallpaper/
+~/Library/LaunchAgents/com.phamous.eink-wallpaper.plist
+```
+
+Structured logs retain operational metadata for 30 days. They exclude prompts, event titles, notes, calendar identifiers, secrets, coordinates, and addresses. Weather requests use only the configured coordinates; use rounded coordinates because underlying forecast grids are not parcel-level.
+
+## Failure behavior
+
+- The morning edition is immutable after a successful upload unless manually regenerated.
+- NWS is primary; Open-Meteo is forecast fallback. Only NWS supplies official alerts.
+- Transient weather and display failures receive bounded retries.
+- If data gathering, generation, QA, or upload fails, the existing e-ink image remains untouched.
+- Visual QA rejects missing/cropped bichons, additional characters, readable text/logos, severe anatomy problems, franchise imagery, clutter, and six-color collapse. One corrected attempt is allowed.
+- A successful upload requires Waveshare’s exact response, a 35-second refresh window, and subsequent server reachability. This verifies delivery, not the physical pixels.
+- Scheduled failures produce one local macOS notification. Successes stay quiet.
+
+## Factory firmware references
+
+- [Waveshare PhotoPainter wiki](https://www.waveshare.com/wiki/ESP32-S3-PhotoPainter)
+- [Official source and firmware](https://github.com/waveshareteam/ESP32-S3-PhotoPainter)
+- [Factory upload server](https://github.com/waveshareteam/ESP32-S3-PhotoPainter/blob/main/01_Example/xiaozhi-esp32/components/app_bsp/server_app.cpp)
+- [Factory browser conversion](https://github.com/waveshareteam/ESP32-S3-PhotoPainter/blob/main/02_SDCARD/03_sys_ap_html/script.min.js)
+
+Weather fallback attribution: [Weather data by Open-Meteo.com](https://open-meteo.com/) under CC BY 4.0.

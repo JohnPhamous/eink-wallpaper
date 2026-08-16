@@ -1,0 +1,30 @@
+{
+  "name": "eink-wallpaper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "eink-wallpaper": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:calendar": "./scripts/build-calendar-reader.sh",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "ai": "^6.0.0",
+    "commander": "^14.0.0",
+    "googleapis": "^160.0.0",
+    "sharp": "^0.35.3",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
