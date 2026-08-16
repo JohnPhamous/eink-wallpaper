@@ -26,6 +26,7 @@ function briefFor(index: number): CreativeBrief {
   const [title, setting, action, mood] = SCENARIOS[index];
   return {
     title,
+    eventCues: [],
     anchorRationale: 'Synthetic model-comparison scenario; contains no personal facts.',
     metaphor: `${title} expressed as an original environmental adventure`,
     setting,

@@ -6,6 +6,11 @@ import type { AppConfig, CreativeBrief, NormalizedEvent, QaResult, WeatherSnapsh
 const briefSchema = z.object({
   title: z.string().min(1).max(100),
   anchorEventIdHash: z.string().optional(),
+  eventCues: z.array(z.object({
+    eventIdHash: z.string().min(1),
+    cue: z.string().min(1).max(240),
+    prominence: z.enum(['primary', 'secondary']),
+  })).max(4),
   anchorRationale: z.string().min(1).max(300),
   metaphor: z.string().min(1).max(300),
   setting: z.string().min(1).max(300),
@@ -15,7 +20,7 @@ const briefSchema = z.object({
   palette: z.array(z.string()).min(3).max(8),
   weatherMotif: z.string().min(1).max(200),
   composition: z.string().min(1).max(300),
-  scenePrompt: z.string().min(1).max(1800),
+  scenePrompt: z.string().min(1).max(2400),
   avoid: z.array(z.string()).min(1).max(20),
   conceptKey: z.string().min(1).max(120),
 });
@@ -64,6 +69,15 @@ function safeEvents(events: NormalizedEvent[]): Array<Record<string, unknown>> {
   }));
 }
 
+function validateCompoundCue(eventTitle: string, cue: string): void {
+  if (!/\bgym\b.*\bsauna\b|\bsauna\b.*\bgym\b/i.test(eventTitle)) return;
+  const representsGym = /\b(gym|weight|kettlebell|dumbbell|barbell|exercise mat|yoga mat|resistance band)\b/i.test(cue);
+  const representsSauna = /\b(sauna|bucket|ladle|steam room|wooden bench)\b/i.test(cue);
+  if (!representsGym || !representsSauna) {
+    throw new Error('The Gym + Sauna cue must contain distinct, recognizable fitness and sauna objects');
+  }
+}
+
 export async function createBrief(
   config: AppConfig,
   editionDate: string,
@@ -90,6 +104,11 @@ export async function createBrief(
     .sort((a, b) => b.baseScore - a.baseScore || a.start.localeCompare(b.start));
   const personalEligible = rankedEligible.filter((event) => event.account === 'personal');
   const eligible = !weather.severe && personalEligible.length > 0 ? personalEligible : rankedEligible;
+  const requiredCueEvents = events
+    .filter((event) => event.eligibleAnchor && event.account === 'personal')
+    .sort((a, b) => b.baseScore - a.baseScore || a.start.localeCompare(b.start))
+    .slice(0, 4);
+  if (requiredCueEvents.length === 0) requiredCueEvents.push(...eligible.slice(0, 3));
   const history = conceptHistory.slice(0, 30).map((entry) => ({
     date: entry.generatedAt.slice(0, 10),
     conceptKey: entry.brief.conceptKey,
@@ -115,7 +134,7 @@ Non-negotiable visual rules:
 - Make cobalt/ultramarine blue and emerald/leaf green the unmistakable dominant chromatic masses—roughly 70% of the colored area—supported by white and deep black. Restrict coral red and warm yellow to a few small focal accents, together under roughly 15% of the frame. Avoid beige, cream, lavender, gray, or brown dominance.
 - Reserve soft blue-to-green gradients for limited sky, atmosphere, water, or reflection areas; preserve large saturated blue and green planes that survive the exact six-color conversion.
 - Blend tactile dimensional materials inside those broad shapes. Avoid flat vector-mascot art, generic children's illustration, dense pavement seams, and tiny decorative detail.
-- Use one unmistakable ordinary object or activity for the primary calendar event and, when meaningful, one subordinate object for a secondary event. A third small cue is allowed only when the day genuinely needs it. Keep every prop bold, simple, factual, unlabeled, and easy to identify after six-color conversion. No ornate machinery, gears, dials, tick marks, clock faces, segmented decorative platforms, or intricate floral constructions.
+- Use one dominant activity for composition, then integrate one unmistakable ordinary object or activity for every event in requiredEventCues. The list is authoritative and contains at most four events. Keep secondary cues subordinate but clearly recognizable after six-color conversion. Combine them into one physical story rather than panels or a collage. For a compound event title, represent each named activity when needed for fidelity—for example, “Gym + Sauna” needs both a simple weight or mat and a wooden sauna bucket or ladle. Keep every prop bold, simple, factual, and unlabeled. No ornate machinery, gears, dials, tick marks, clock faces, segmented decorative platforms, or intricate floral constructions.
 - Translate work concepts into natural, spatial, or sculptural metaphors. Never use desks, consoles, screens, dashboards, office interiors, holograms, wireframes, node networks, technical diagrams, floating UI, grids, or intricate geometric clusters.
 - Keep the bichon physically active in the environment—running, leaping, climbing, carrying, digging, balancing, or exploring. Simple ordinary event objects may drive the action, but never pose the dog working at desks, screens, consoles, vehicles, or complex human machinery.
 - Favor a closer cinematic tableau with the bichon actively carrying, nudging, arranging, opening, investigating, or moving toward the primary event object. Preserve enough environmental breathing room for weather, place, and mood.
@@ -130,34 +149,60 @@ Editorial rules:
 - Ordinary weather changes only sky, light, wind, and ground conditions. Notable weather may become a stronger motif. A severe official alert overrides the calendar anchor.
 - The primary event must be recognizable at a glance through a literal activity, setting, or ordinary event-specific object. Symbolism may enrich the scene but can never replace this concrete cue. Avoid generic glowing seeds, orbs, stones, portals, alignment rituals, mountain quests, unexplained smoke, and other visual metaphors that obscure the calendar meaning.
 - Prefer objects specific enough to distinguish the event: a baby shower needs a tiny pair of baby booties, rattle, folded baby blanket, or similar cue alongside any gift; a medical checkup needs a recognizable unlabeled medical object; a workout needs a simple weight, band, or mat. A generic gift, bag, bowl, sphere, or landscape alone is insufficient when the event type offers a clearer ordinary object.
-- When a meaningful secondary event exists, integrate one subordinate literal cue into the same coherent scene so the artwork feels like the day rather than a single isolated appointment.
+- Every requiredEventCues entry must appear in eventCues with the same event ID and a concrete visual cue, and every listed cue must be explicitly implemented in scenePrompt. Choose exactly one primary cue unless severe weather is the primary subject; mark the rest secondary. Never put an object needed by eventCues into avoid.
 - Freely invent composition, environment, motion, and visual relationships between factual objects. Never invent an obligation, person, destination, relationship, object implication, or weather condition.
 - Avoid recent concepts, compositions, and palettes. ${newConcept ? 'The user explicitly requested a substantially new concept and eligible anchor where possible.' : ''}
 
 ${studyDirection ? `Aesthetic-study override—follow this while preserving the factual, privacy, single-character, no-text, and no-franchise rules:\n${studyDirection}` : ''}
 
-Required JSON keys: title, anchorEventIdHash (optional), anchorRationale, metaphor, setting, bichonAction, mood, lighting, palette (3-8 plain color names), weatherMotif, composition, scenePrompt, avoid (array), conceptKey. List cobalt/ultramarine blue and emerald/leaf green first in palette. The scenePrompt must be a complete production prompt implementing every visual rule, including the compact chibi bichon, literal calendar cues, closer full-bleed tableau, fluid cel-and-gouache treatment, and blue-green color hierarchy.`;
+Required JSON keys: title, anchorEventIdHash (optional), eventCues (array of eventIdHash, cue, prominence), anchorRationale, metaphor, setting, bichonAction, mood, lighting, palette (3-8 plain color names), weatherMotif, composition, scenePrompt, avoid (array), conceptKey. List cobalt/ultramarine blue and emerald/leaf green first in palette. The scenePrompt must be a complete production prompt implementing every eventCues item and every visual rule, including the compact chibi bichon, closer full-bleed tableau, fluid cel-and-gouache treatment, and blue-green color hierarchy.`;
   const input = {
     editionDate,
     timezone: config.timezone,
     weather,
     eligibleAnchorCandidates: safeEvents(eligible),
+    requiredEventCues: safeEvents(requiredCueEvents),
     contextOnlyEvents: safeEvents(events.filter((event) => !eligibleIds.has(event.idHash))),
     recentConceptsToAvoid: history,
   };
-  const result = await generateText({
-    model: gateway(config.models.brief),
-    system,
-    prompt: JSON.stringify(input),
-    temperature: 0.8,
-    abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
-    providerOptions: { gateway: gatewayPrivacy },
-  });
-  const brief = parseJson(result.text, briefSchema);
-  if (brief.anchorEventIdHash && !eligible.some((event) => event.idHash === brief.anchorEventIdHash)) {
-    throw new Error('Creative director selected an ineligible or nonexistent anchor event');
+  const requiredCueIds = new Set(requiredCueEvents.map((event) => event.idHash));
+  const eventById = new Map(requiredCueEvents.map((event) => [event.idHash, event]));
+  let correction: string | undefined;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const result = await generateText({
+      model: gateway(config.models.brief),
+      system,
+      prompt: `${JSON.stringify(input)}${correction ? `\nCorrect the prior invalid response: ${correction}` : ''}`,
+      temperature: 0.8,
+      abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+      providerOptions: { gateway: gatewayPrivacy },
+    });
+    try {
+      const generated = parseJson(result.text, briefSchema);
+      if (generated.anchorEventIdHash && !eligible.some((event) => event.idHash === generated.anchorEventIdHash)) {
+        throw new Error('Creative director selected an ineligible or nonexistent anchor event');
+      }
+      const returnedCueIds = new Set(generated.eventCues.map((cue) => cue.eventIdHash));
+      if (requiredCueIds.size !== returnedCueIds.size || [...requiredCueIds].some((id) => !returnedCueIds.has(id))) {
+        throw new Error('Creative director omitted or invented a required calendar cue');
+      }
+      const primaryCues = generated.eventCues.filter((cue) => cue.prominence === 'primary');
+      if (!weather.severe && requiredCueIds.size > 0 && (primaryCues.length !== 1 || primaryCues[0].eventIdHash !== generated.anchorEventIdHash)) {
+        throw new Error('Creative director did not align the primary cue with the calendar anchor');
+      }
+      const eventCues = generated.eventCues.map((cue) => {
+        const event = eventById.get(cue.eventIdHash);
+        if (!event) throw new Error('Creative director invented a calendar cue');
+        validateCompoundCue(event.title, cue.cue);
+        return { ...cue, eventTitle: event.title };
+      });
+      return { ...generated, eventCues };
+    } catch (error) {
+      if (attempt === 3) throw error;
+      correction = error instanceof Error ? error.message : String(error);
+    }
   }
-  return brief;
+  throw new Error('Creative director failed to create a valid brief');
 }
 
 export async function generateArtwork(
@@ -169,7 +214,9 @@ export async function generateArtwork(
   const gateway = await prepareGateway();
   const prompt = `${brief.scenePrompt}
 
-Style lock: a fluid hand-drawn 2D adventure-animation keyframe with broad gouache color masses, never photorealistic and never a 3D render. Use simplified expressive contours, reduced line density, elastic motion, dynamic foreshortening, cel-shaped light and shadow, pastel-futuristic atmosphere, and painterly dimensional environmental textures. The single bichon has a large round fluffy head, compact cloud-like body, short legs, tiny paws, huge dark expressive eyes, tiny muzzle, puffy ears, and roughly two-heads-long chibi proportions while remaining clearly canine. Use a closer full-bleed tableau with the fully visible dog at 30-35% frame height, actively interacting with one literal primary calendar cue and at most one subordinate secondary cue. Preserve scenic breathing room. Cobalt/ultramarine blue and emerald/leaf green must dominate the colored area; red and yellow are sparse focal accents only.
+Style lock: a fluid hand-drawn 2D adventure-animation keyframe with broad gouache color masses, never photorealistic and never a 3D render. Use simplified expressive contours, reduced line density, elastic motion, dynamic foreshortening, cel-shaped light and shadow, pastel-futuristic atmosphere, and painterly dimensional environmental textures. The single bichon has a large round fluffy head, compact cloud-like body, short legs, tiny paws, huge dark expressive eyes, tiny muzzle, puffy ears, and roughly two-heads-long chibi proportions while remaining clearly canine. Use a closer full-bleed tableau with the fully visible dog at 30-35% frame height, actively interacting with the literal primary calendar cue. Every eventCues item must remain visibly recognizable, with secondary cues integrated as simple subordinate props in the same physical scene. Preserve scenic breathing room. Cobalt/ultramarine blue and emerald/leaf green must dominate the colored area; red and yellow are sparse focal accents only.
+
+Required calendar cues: ${JSON.stringify(brief.eventCues ?? [])}
 
 ${aestheticDirection ? `Aesthetic study direction: ${aestheticDirection}\nThis direction overrides the generic medium and mark-making choices in the style lock, but never the subject, factual, composition-safe-area, palette-hierarchy, or hard-exclusion rules.` : ''}
 
@@ -230,8 +277,8 @@ export async function inspectArtwork(
           {
             type: 'text',
             text: `Inspect this candidate for a personal e-ink artwork. Return strict JSON only: {"pass":boolean,"reasons":string[],"correction":string}.
-${brief ? `Validate semantic fidelity against this private creative brief: ${JSON.stringify({ anchorRationale: brief.anchorRationale, setting: brief.setting, bichonAction: brief.bichonAction, weatherMotif: brief.weatherMotif, scenePrompt: brief.scenePrompt })}` : ''}
-Reject if: the single white fluffy bichon is absent or badly cropped; the bichon lacks the requested compact round-headed chibi appeal; any other living character, person, animal, robot, creature, silhouette, or face appears; any readable text, letters, numbers, signage, logo, UI, caption, or watermark appears; any decorative border, inset picture frame, panel, or boxed composition appears; severe anatomy errors; cluttered composition; weak central safe-area composition; childish tone; recognizable franchise imagery; photorealistic treatment; realistic photography; a plush-toy or soft 3D-rendered bichon; insufficient fluid hand-drawn cel-and-gouache character; an anchored calendar event is replaced by an unreadable abstract metaphor instead of a recognizable activity, setting, or ordinary object; the image contradicts the supplied brief; blue and green are not the clearly dominant chromatic masses; red/yellow overwhelm the blue-green hierarchy; or the overall scene becomes illegible in the exact black/white/green/blue/red/yellow palette. Any secondary event object explicitly requested by scenePrompt is required and must not be rejected merely because its event ranks below the primary anchor. Minor painterly ambiguity and small accent-hue shifts are acceptable. Do not reject solely because a sparse red or yellow accent darkens, shifts hue, or disappears after dithering when the subject, action, and blue-green composition remain clear. Chibi proportions are intentional and should not be rejected as childish when the overall direction remains sophisticated. ${studyAcceptance ?? ''} The correction must be a concise regeneration instruction.`,
+${brief ? `Validate semantic fidelity against this private creative brief: ${JSON.stringify({ eventCues: brief.eventCues ?? [], anchorRationale: brief.anchorRationale, setting: brief.setting, bichonAction: brief.bichonAction, weatherMotif: brief.weatherMotif, scenePrompt: brief.scenePrompt })}` : ''}
+Reject if: the single white fluffy bichon is absent or badly cropped; the bichon lacks the requested compact round-headed chibi appeal; any other living character, person, animal, robot, creature, silhouette, or face appears; any readable text, letters, numbers, signage, logo, UI, caption, or watermark appears; any decorative border, inset picture frame, panel, or boxed composition appears; severe anatomy errors; cluttered composition; weak central safe-area composition; childish tone; recognizable franchise imagery; photorealistic treatment; realistic photography; a plush-toy or soft 3D-rendered bichon; insufficient fluid hand-drawn cel-and-gouache character; an anchored calendar event is replaced by an unreadable abstract metaphor instead of a recognizable activity, setting, or ordinary object; any eventCues item is absent or not recognizable in either the source or six-color preview; the image contradicts the supplied brief; blue and green are not the clearly dominant chromatic masses; red/yellow overwhelm the blue-green hierarchy; or the overall scene becomes illegible in the exact black/white/green/blue/red/yellow palette. Every eventCues item is required even when secondary. A compound cue may require multiple simple objects, such as a weight plus sauna bucket. Minor painterly ambiguity and small accent-hue shifts are acceptable. Do not reject solely because a sparse red or yellow accent darkens, shifts hue, or disappears after dithering when the subject, action, and blue-green composition remain clear. Chibi proportions are intentional and should not be rejected as childish when the overall direction remains sophisticated. ${studyAcceptance ?? ''} The correction must name every missing or ambiguous required cue and give a concise regeneration instruction.`,
           },
           { type: 'image', image: original },
           {

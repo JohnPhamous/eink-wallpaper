@@ -53,14 +53,18 @@ export async function runPipeline(config: AppConfig, options: RunOptions): Promi
       events: events.map((event) => ({ ...event, notes: event.notes ? hash(event.notes) : undefined })),
       weather,
     }, 32);
-    const priorBrief = options.mode === 'regenerate' && state.latest?.editionDate === editionDate
+    const priorBrief = options.mode === 'regenerate'
+      && state.latest?.editionDate === editionDate
+      && state.latest.brief.eventCues?.length
+      && state.latest.brief.eventCues.every((cue) => Boolean(cue.eventTitle))
       ? state.latest.brief
       : undefined;
     const brief = priorBrief ?? await createBrief(config, editionDate, events, weather, history, options.newConcept);
     let correction: string | undefined;
     let finalManifest: EditionManifest | undefined;
 
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const runId = `${Date.now()}-${randomUUID().slice(0, 8)}-a${attempt}`;
       const artwork = await generateArtwork(config, brief, correction);
       const rendered = await renderArtwork(artwork.bytes);
@@ -80,7 +84,7 @@ export async function runPipeline(config: AppConfig, options: RunOptions): Promi
       if (!qa.pass) {
         await log('warn', 'artwork_rejected', { editionDate, runId, attempt, reasonCount: qa.reasons.length });
         correction = qa.correction || qa.reasons.join('; ');
-        if (attempt === 2) throw new Error('Both generated candidates failed visual QA; preserving the current display');
+        if (attempt === maxAttempts) throw new Error('All generated candidates failed visual QA; preserving the current display');
         continue;
       }
 

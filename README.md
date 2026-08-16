@@ -10,7 +10,7 @@ No Glanceboard, server, custom firmware, Swift helper, or macOS app is involved.
 - Exactly one character: a white fluffy bichon with a subtle cobalt-blue collar.
 - No text, clocks, logos, UI, panels, people, or other creatures.
 - A warm, sophisticated animation-inspired language: reduced line density, fluid motion, pastel-futuristic gradients, and dimensional environmental texture.
-- Personal events outrank work; unusual events outrank routine ones; severe weather can override the calendar.
+- Personal events outrank work; unusual events outrank routine ones; severe weather can override the calendar. One activity leads the composition, while every meaningful personal event—up to four—gets a recognizable literal cue and is checked by visual QA.
 - Native 16:9 model generation, center-cropped by only 3.125% per side to the display’s 5:3 frame.
 
 Only the exact six-color e-ink result is retained. Each accepted daily image creates one human-viewable PNG, one upload-ready BMP, and one metadata JSON at `editions/YYYY/YYYY-MM-DD.*`. Full-color model output and rejected attempts remain in memory only. Raw calendar payloads exist only in memory during a run.

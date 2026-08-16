@@ -76,6 +76,12 @@ export interface WeatherSnapshot {
 export interface CreativeBrief {
   title: string;
   anchorEventIdHash?: string;
+  eventCues: Array<{
+    eventIdHash: string;
+    eventTitle: string;
+    cue: string;
+    prominence: 'primary' | 'secondary';
+  }>;
   anchorRationale: string;
   metaphor: string;
   setting: string;
