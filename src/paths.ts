@@ -11,6 +11,7 @@ export const paths = {
   candidates: path.join(home, 'Library', 'Application Support', 'Eink Wallpaper', 'candidates'),
   archives: path.join(home, 'Library', 'Application Support', 'Eink Wallpaper', 'archives'),
   cache: path.join(home, 'Library', 'Application Support', 'Eink Wallpaper', 'cache'),
+  melloReferences: path.join(home, 'Library', 'Application Support', 'Eink Wallpaper', 'references', 'mello'),
   logs: path.join(home, 'Library', 'Logs', 'Eink Wallpaper'),
   launchAgent: path.join(home, 'Library', 'LaunchAgents', 'com.phamous.eink-wallpaper.plist'),
 };

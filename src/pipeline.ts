@@ -8,6 +8,7 @@ import { loadEdition, loadState, promoteLatest, recentBriefs, recordFailure, sav
 import { renderArtwork } from './render.js';
 import { uploadBmp } from './display.js';
 import { log, pruneLogs } from './logger.js';
+import { buildNarrativeContext } from './story.js';
 import { midnightUtc, todayBounds } from './time.js';
 import type { AppConfig, EditionManifest, RunOptions } from './types.js';
 
@@ -44,14 +45,16 @@ export async function runPipeline(config: AppConfig, options: RunOptions): Promi
         return existing.manifest;
       }
     }
-    const [events, weather, history] = await Promise.all([
+    const [events, weather, history, narrativeContext] = await Promise.all([
       fetchTodayEvents(config, editionNow),
       fetchWeather(config, editionDate),
       recentBriefs(config.art.conceptMemoryDays),
+      buildNarrativeContext(config, editionDate),
     ]);
     const inputHash = hash({
       events: events.map((event) => ({ ...event, notes: event.notes ? hash(event.notes) : undefined })),
       weather,
+      story: narrativeContext,
     }, 32);
     const priorBrief = options.mode === 'regenerate'
       && state.latest?.editionDate === editionDate
@@ -59,11 +62,11 @@ export async function runPipeline(config: AppConfig, options: RunOptions): Promi
       && state.latest.brief.eventCues.every((cue) => Boolean(cue.eventTitle))
       ? state.latest.brief
       : undefined;
-    const brief = priorBrief ?? await createBrief(config, editionDate, events, weather, history, options.newConcept);
+    const brief = priorBrief ?? await createBrief(config, editionDate, events, weather, history, options.newConcept, undefined, narrativeContext);
     let correction: string | undefined;
     let finalManifest: EditionManifest | undefined;
 
-    const maxAttempts = 3;
+    const maxAttempts = 5;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const runId = `${Date.now()}-${randomUUID().slice(0, 8)}-a${attempt}`;
       const artwork = await generateArtwork(config, brief, correction);

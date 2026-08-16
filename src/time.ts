@@ -43,8 +43,12 @@ export function midnightUtc(localDate: string, timeZone: string): Date {
 }
 
 export function nextDateKey(localDate: string): string {
+  return shiftDateKey(localDate, 1);
+}
+
+export function shiftDateKey(localDate: string, days: number): string {
   const [year, month, day] = localDate.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
 export function todayBounds(timeZone: string, now = new Date()): { date: string; start: Date; end: Date } {

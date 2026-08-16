@@ -81,6 +81,7 @@ export interface CreativeBrief {
     eventTitle: string;
     cue: string;
     prominence: 'primary' | 'secondary';
+    visualGroup?: string;
   }>;
   anchorRationale: string;
   metaphor: string;
@@ -91,15 +92,81 @@ export interface CreativeBrief {
   palette: string[];
   weatherMotif: string;
   composition: string;
+  visualPlan?: {
+    focalHierarchy: string;
+    camera: string;
+    silhouetteAndGesture: string;
+    depthAndScale: string;
+    valueAndLighting: string;
+    colorStrategy: string;
+    eyePathAndNegativeSpace: string;
+  };
   scenePrompt: string;
   avoid: string[];
   conceptKey: string;
+  story?: StoryContinuity;
+}
+
+export type WorldLocationKey = string;
+
+export interface StoryContinuity {
+  editionKind: 'daily-chapter' | 'sunday-tapestry';
+  worldLocationKey: WorldLocationKey;
+  worldLocationDescription: string;
+  narrativeBeat: string;
+  carriedMotifs: string[];
+  weeklyEchoes: Array<{
+    sourceDate: string;
+    eventTitle: string;
+    cue: string;
+  }>;
+  anniversaryEcho?: {
+    sourceDate: string;
+    motif: string;
+    reinterpretation: string;
+  };
+}
+
+export interface StoryMemory {
+  sourceDate: string;
+  title: string;
+  setting: string;
+  metaphor: string;
+  eventCues: CreativeBrief['eventCues'];
+  worldLocationKey?: WorldLocationKey;
+  worldLocationDescription?: string;
+  narrativeBeat?: string;
+  carriedMotifs: string[];
+}
+
+export interface NarrativeContext {
+  editionKind: StoryContinuity['editionKind'];
+  previousChapter?: StoryMemory;
+  locationHistory: Array<{
+    key: WorldLocationKey;
+    description: string;
+    appearances: number;
+    lastUsed: string;
+  }>;
+  recentMotifs: Array<{ sourceDate: string; motifs: string[] }>;
+  weeklyMemories: StoryMemory[];
+  anniversary?: StoryMemory;
 }
 
 export interface QaResult {
   pass: boolean;
   reasons: string[];
   correction: string;
+  scores?: {
+    focalHierarchy: number;
+    compositionAndDepth: number;
+    melloAppeal: number;
+    calendarFidelity: number;
+    originalityAndSpecificity: number;
+    styleAndCraft: number;
+    einkReadability: number;
+    average: number;
+  };
 }
 
 export interface EditionManifest {

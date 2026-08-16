@@ -118,6 +118,14 @@ export async function loadEdition(date: string): Promise<StoredEdition | undefin
   return loadStored(editionFiles(date));
 }
 
+export async function loadEditionManifest(date: string): Promise<EditionManifest | undefined> {
+  try {
+    return JSON.parse(await readFile(editionFiles(date).manifest, 'utf8')) as EditionManifest;
+  } catch {
+    return undefined;
+  }
+}
+
 async function editionManifestFiles(): Promise<string[]> {
   let years: string[];
   try {
@@ -153,6 +161,22 @@ export async function recentBriefs(days: number): Promise<Array<{ generatedAt: s
     }
   }
   return output.sort((a, b) => b.generatedAt.localeCompare(a.generatedAt));
+}
+
+export async function editionManifestsBefore(date: string, days: number): Promise<EditionManifest[]> {
+  const earliest = new Date(`${date}T12:00:00Z`);
+  earliest.setUTCDate(earliest.getUTCDate() - days);
+  const earliestDate = earliest.toISOString().slice(0, 10);
+  const output: EditionManifest[] = [];
+  for (const file of await editionManifestFiles()) {
+    try {
+      const manifest = JSON.parse(await readFile(file, 'utf8')) as EditionManifest;
+      if (manifest.editionDate >= earliestDate && manifest.editionDate < date && !manifest.rejected) output.push(manifest);
+    } catch {
+      // Story continuity is best effort; one damaged edition must not block today.
+    }
+  }
+  return output.sort((a, b) => a.editionDate.localeCompare(b.editionDate));
 }
 
 export async function promoteLatest(manifest: EditionManifest, png: Buffer, bmp: Buffer): Promise<void> {

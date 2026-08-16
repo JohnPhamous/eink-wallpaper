@@ -144,7 +144,11 @@ function titleSignals(title: string): { bonus: number; reasons: string[] } {
     bonus += 35;
     reasons.push('major day-shaping event');
   }
-  if (/\b(1:?1|one on one|sync|standup|office hours|review)\b/.test(lower)) {
+  if (/\b(interview|hiring|performance review|perf review|calibration|epd review|design forum|design leads)\b/.test(lower)) {
+    bonus += 12;
+    reasons.push('high-signal work event');
+  }
+  if (/\b(1:?1|one on one|sync|standup|office hours)\b/.test(lower)) {
     bonus -= 8;
     reasons.push('routine meeting');
   }
