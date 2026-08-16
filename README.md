@@ -58,6 +58,8 @@ Authorize the local Calendar reader once:
 eink-wallpaper authorize local
 ```
 
+The local reader uses an ad-hoc signature. Rebuilding it changes its macOS privacy identity, so always run `eink-wallpaper authorize local` again after `npm run build:calendar`. Normal TypeScript builds do not affect Calendar authorization. `install-agent` verifies Calendar access before installing the schedule.
+
 EventKit reads recurring instances from the local Calendar store. Calendar names and event-title prefixes in the configured exclusion lists are discarded before normalization. Coordinates, calendar filters, source matchers, the display address, and the NWS contact stay in the untracked local configuration. The Gateway key is stored as a generic password in the login Keychain under `com.phamous.eink-wallpaper`; configuration contains no credentials.
 
 ## Prepare the PhotoPainter

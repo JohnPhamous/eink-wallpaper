@@ -343,7 +343,9 @@ program
   .command('install-agent')
   .description('Install the 5:30am per-user LaunchAgent')
   .action(async () => {
-    await installLaunchAgent(await loadConfig());
+    const config = await loadConfig();
+    await fetchTodayEvents(config);
+    await installLaunchAgent(config);
     output.write(`Installed ${paths.launchAgent}\n`);
   });
 

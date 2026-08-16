@@ -20,3 +20,4 @@ xcrun swiftc \
   -o "$output"
 codesign --force --sign - --identifier com.phamous.eink-wallpaper.calendar-reader "$output"
 echo "Built $output"
+echo "Calendar authorization must be renewed after rebuilding: eink-wallpaper authorize local"
