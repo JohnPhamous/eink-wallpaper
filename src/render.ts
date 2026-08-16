@@ -1,6 +1,4 @@
-import path from 'node:path';
 import sharp from 'sharp';
-import { atomicWrite, ensureDirectory } from './fs.js';
 
 const WIDTH = 800;
 const HEIGHT = 480;
@@ -108,17 +106,46 @@ export function encodeBmp24(rgb: Buffer, width = WIDTH, height = HEIGHT): Buffer
   return output;
 }
 
+export function decodeBmp24(bmp: Buffer, width = WIDTH, height = HEIGHT): Buffer {
+  if (
+    bmp.toString('ascii', 0, 2) !== 'BM'
+    || bmp.readInt32LE(18) !== width
+    || bmp.readInt32LE(22) !== height
+    || bmp.readUInt16LE(28) !== 24
+    || bmp.readUInt32LE(30) !== 0
+  ) {
+    throw new Error(`Expected an uncompressed ${width}x${height} 24-bit BMP`);
+  }
+  const pixelOffset = bmp.readUInt32LE(10);
+  const rowStride = Math.ceil((width * 3) / 4) * 4;
+  if (bmp.length < pixelOffset + rowStride * height) throw new Error('BMP pixel data is truncated');
+  const rgb = Buffer.alloc(width * height * 3);
+  for (let y = 0; y < height; y += 1) {
+    const targetY = height - 1 - y;
+    for (let x = 0; x < width; x += 1) {
+      const source = pixelOffset + y * rowStride + x * 3;
+      const target = (targetY * width + x) * 3;
+      rgb[target] = bmp[source + 2];
+      rgb[target + 1] = bmp[source + 1];
+      rgb[target + 2] = bmp[source];
+    }
+  }
+  return rgb;
+}
+
+export async function previewFromBmp(bmp: Buffer): Promise<Buffer> {
+  return sharp(decodeBmp24(bmp), { raw: { width: WIDTH, height: HEIGHT, channels: 3 } })
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+}
+
 export interface RenderedArtwork {
-  originalFile: string;
-  previewFile: string;
-  bmpFile: string;
   original: Buffer;
   preview: Buffer;
   bmp: Buffer;
 }
 
-export async function renderArtwork(source: Buffer, directory: string): Promise<RenderedArtwork> {
-  await ensureDirectory(directory);
+export async function renderArtwork(source: Buffer): Promise<RenderedArtwork> {
   const original = await sharp(source).rotate().png({ compressionLevel: 9 }).toBuffer();
   const raw = await sharp(original)
     .resize(WIDTH, HEIGHT, { fit: 'cover', position: 'centre' })
@@ -129,16 +156,8 @@ export async function renderArtwork(source: Buffer, directory: string): Promise<
     .toBuffer();
   const dithered = ditherSixColor(raw);
   const preview = await sharp(dithered, { raw: { width: WIDTH, height: HEIGHT, channels: 3 } })
-    .png({ compressionLevel: 9, palette: true, colours: 6 })
+    .png({ compressionLevel: 9 })
     .toBuffer();
   const bmp = encodeBmp24(dithered);
-  const originalFile = 'original.png';
-  const previewFile = 'display-preview.png';
-  const bmpFile = 'display.bmp';
-  await Promise.all([
-    atomicWrite(path.join(directory, originalFile), original),
-    atomicWrite(path.join(directory, previewFile), preview),
-    atomicWrite(path.join(directory, bmpFile), bmp),
-  ]);
-  return { originalFile, previewFile, bmpFile, original, preview, bmp };
+  return { original, preview, bmp };
 }

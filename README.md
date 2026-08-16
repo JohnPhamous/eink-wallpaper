@@ -13,7 +13,7 @@ No Glanceboard, server, custom firmware, Swift helper, or macOS app is involved.
 - Personal events outrank work; unusual events outrank routine ones; severe weather can override the calendar.
 - Native 16:9 model generation, center-cropped by only 3.125% per side to the display’s 5:3 frame.
 
-The full-color original, six-color preview, exact BMP, sanitized creative brief, QA result, and manifest are archived. Raw calendar payloads exist only in memory during a run.
+Only the exact six-color e-ink result is retained. Each accepted daily image creates one human-viewable PNG, one upload-ready BMP, and one metadata JSON at `editions/YYYY/YYYY-MM-DD.*`. Full-color model output and rejected attempts remain in memory only. Raw calendar payloads exist only in memory during a run.
 
 ## Requirements
 
@@ -78,7 +78,7 @@ Check credentials, calendar access, weather, and the display without generating 
 eink-wallpaper doctor
 ```
 
-Generate an archived candidate without changing the frame:
+Generate a replaceable e-ink candidate without changing the frame:
 
 ```sh
 eink-wallpaper generate --no-upload
@@ -107,6 +107,7 @@ eink-wallpaper generate [--no-upload] [--force]
 eink-wallpaper regenerate [--new-concept] [--no-upload]
 eink-wallpaper upload ./display.bmp
 eink-wallpaper restore YYYY-MM-DD
+eink-wallpaper migrate-storage
 eink-wallpaper bakeoff
 eink-wallpaper set-image-model google/gemini-3.1-flash-image
 eink-wallpaper install-agent
@@ -114,7 +115,7 @@ eink-wallpaper kick
 eink-wallpaper uninstall-agent
 ```
 
-`regenerate` retains the day’s chosen concept but asks for another composition. `regenerate --new-concept` asks for a different eligible anchor or metaphor. Every rejected and accepted attempt remains archived, and accepted concepts, compositions, and palettes influence a 30-day novelty ledger.
+`regenerate` retains the day’s chosen concept but asks for another composition. `regenerate --new-concept` asks for a different eligible anchor or metaphor. Rejected attempts and full-color sources are not retained. Published concepts influence a 30-day novelty ledger.
 
 The configured image model defaults to Gemini. A different AI Gateway image slug can be selected explicitly, but do not send private calendar context to a provider unless its Gateway route satisfies the desired ZDR and training policy.
 
@@ -130,8 +131,12 @@ Every model request explicitly requires Gateway `zeroDataRetention` and `disallo
   state.json
   latest.bmp
   latest.png
-  latest-original.png
-  archives/YYYY-MM-DD/<run-id>/
+  editions/YYYY/YYYY-MM-DD.png
+  editions/YYYY/YYYY-MM-DD.bmp
+  editions/YYYY/YYYY-MM-DD.json
+  candidates/YYYY-MM-DD.png
+  candidates/YYYY-MM-DD.bmp
+  candidates/YYYY-MM-DD.json
   cache/
 
 ~/Library/Logs/Eink Wallpaper/
@@ -139,6 +144,8 @@ Every model request explicitly requires Gateway `zeroDataRetention` and `disallo
 ```
 
 Structured logs retain operational metadata for 30 days. They exclude prompts, event titles, notes, calendar identifiers, secrets, coordinates, and addresses. Weather requests use only the configured coordinates; use rounded coordinates because underlying forecast grids are not parcel-level.
+
+`editions/` is the long-term chronological gallery. A date appears there as soon as its artwork passes visual QA, before delivery, so a temporary display outage cannot leave a hole or discard a paid generation. If upload fails, the next normal run retries that exact BMP. Republishing the same local date atomically replaces that date's three files. `candidates/` holds at most one manually generated, unpublished e-ink candidate per date; publishing it through `restore YYYY-MM-DD` moves it into the dated gallery.
 
 ## Failure behavior
 

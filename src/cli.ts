@@ -10,7 +10,7 @@ import { checkDisplay, uploadBmpFile } from './display.js';
 import { getSecret, hasSecret, setSecret } from './keychain.js';
 import { installLaunchAgent, kickstartLaunchAgent, uninstallLaunchAgent } from './launchd.js';
 import { paths } from './paths.js';
-import { manifestsForDate, loadState, promoteLatest, runDirectory, saveManifest } from './archive.js';
+import { loadCandidate, loadEdition, loadState, migrateLegacyStorage, promoteLatest } from './archive.js';
 import { uploadBmp } from './display.js';
 import { runPipeline, sendScheduledFailureNotification } from './pipeline.js';
 import { fetchWeather } from './weather.js';
@@ -178,6 +178,14 @@ program
   });
 
 program
+  .command('migrate-storage')
+  .description('Create the yearly e-ink gallery and remove retained full-color outputs')
+  .action(async () => {
+    const result = await migrateLegacyStorage();
+    output.write(`Storage migrated${result.editionDate ? ` through ${result.editionDate}` : ''}; preserved ${result.migratedDates.length} dated e-ink edition(s) and removed ${result.removedFullColorFiles} full-color files.\n`);
+  });
+
+program
   .command('style-study')
   .description('Generate four aesthetic directions across today and the next Monday; never uploads')
   .option('--rebuild <directory>', 'Rebuild contact sheets for an existing study without generating images')
@@ -265,20 +273,17 @@ program
 
 program
   .command('restore')
-  .description('Restore the newest accepted archived edition for a date')
+  .description('Publish the saved candidate or restore the published edition for a date')
   .argument('<date>', 'YYYY-MM-DD')
   .action(async (date: string) => {
     const config = await loadConfig();
-    const manifest = (await manifestsForDate(date)).find((candidate) => candidate.qa.pass && !candidate.rejected);
-    if (!manifest) throw new Error(`No accepted archive found for ${date}`);
-    const file = path.join(runDirectory(manifest.editionDate, manifest.runId), manifest.bmpFile);
-    const bmp = await readFile(file);
-    const receipt = await uploadBmp(config, bmp);
-    manifest.uploadedAt = receipt.verifiedAt;
-    manifest.uploadVerified = true;
-    await saveManifest(manifest);
-    await promoteLatest(manifest);
-    output.write(`Restored ${date}/${manifest.runId}.\n`);
+    const stored = await loadCandidate(date) ?? await loadEdition(date);
+    if (!stored) throw new Error(`No e-ink candidate or published edition found for ${date}`);
+    const receipt = await uploadBmp(config, stored.bmp);
+    stored.manifest.uploadedAt = receipt.verifiedAt;
+    stored.manifest.uploadVerified = true;
+    await promoteLatest(stored.manifest, stored.png, stored.bmp);
+    output.write(`Restored ${date}/${stored.manifest.runId}.\n`);
   });
 
 program

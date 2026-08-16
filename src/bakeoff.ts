@@ -62,8 +62,11 @@ export async function runBichonBakeoff(
       };
       const sceneDirectory = path.join(root, `${String(index + 1).padStart(2, '0')}-${label}`);
       const generated = await generateArtwork(candidateConfig, briefFor(index));
-      const rendered = await renderArtwork(generated.bytes, sceneDirectory);
-      outputs.push(path.relative(root, path.join(sceneDirectory, rendered.previewFile)));
+      const rendered = await renderArtwork(generated.bytes);
+      await ensureDirectory(sceneDirectory);
+      const previewFile = path.join(sceneDirectory, 'display-preview.png');
+      await atomicWrite(previewFile, rendered.preview);
+      outputs.push(path.relative(root, previewFile));
     }
     answers.push({ scene: index + 1, A: ordered[0], B: ordered[1] });
     sections.push(`<section><h2>Scene ${index + 1}</h2><div><figure><img src="${outputs[0]}"><figcaption>A</figcaption></figure><figure><img src="${outputs[1]}"><figcaption>B</figcaption></figure></div></section>`);

@@ -97,7 +97,7 @@ export interface QaResult {
 }
 
 export interface EditionManifest {
-  schemaVersion: 1;
+  schemaVersion: 2;
   editionDate: string;
   runId: string;
   generatedAt: string;
@@ -106,9 +106,6 @@ export interface EditionManifest {
   model: string;
   brief: CreativeBrief;
   qa: QaResult;
-  originalFile: string;
-  previewFile: string;
-  bmpFile: string;
   uploadedAt?: string;
   uploadVerified?: boolean;
   rejected?: boolean;

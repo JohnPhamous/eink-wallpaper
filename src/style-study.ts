@@ -141,7 +141,6 @@ async function contactSheet(
   dates: Array<{ date: string; label: string }>,
   variants: StudyVariant[],
   styles: StyleDirection[],
-  imageFile: 'original.png' | 'display-preview.png',
 ): Promise<void> {
   const tileWidth = 800;
   const imageHeight = 480;
@@ -163,7 +162,7 @@ async function contactSheet(
       if (!variant) continue;
       const label = Buffer.from(`<svg width="${tileWidth}" height="${labelHeight}"><rect width="100%" height="100%" fill="#f5f2ea"/><text x="20" y="35" font-family="-apple-system,Helvetica,sans-serif" font-size="22" font-weight="600" fill="#111">${row + 1}. ${escapeHtml(styles[row].label)}</text></svg>`);
       const top = headerHeight + row * rowHeight;
-      const tile = await sharp(path.join(variant.directory, imageFile))
+      const tile = await sharp(path.join(variant.directory, 'display-preview.png'))
         .resize(tileWidth, imageHeight, { fit: 'cover', position: 'centre' })
         .png()
         .toBuffer();
@@ -184,12 +183,12 @@ function studyHtml(dates: Array<{ date: string; label: string }>, variants: Stud
       const variant = variants.find((candidate) => candidate.styleId === style.id && candidate.date === date);
       if (!variant) return '<td>Missing</td>';
       const relative = path.basename(variant.directory);
-      return `<td><img src="${escapeHtml(path.join(relative, 'original.png'))}" alt="${escapeHtml(style.label)} original"><img src="${escapeHtml(path.join(relative, 'display-preview.png'))}" alt="${escapeHtml(style.label)} e-ink preview"><p>QA: ${variant.qa.pass ? 'pass' : 'review'} · attempts: ${variant.attempts}</p></td>`;
+      return `<td><img src="${escapeHtml(path.join(relative, 'display-preview.png'))}" alt="${escapeHtml(style.label)} e-ink preview"><p>QA: ${variant.qa.pass ? 'pass' : 'review'} · attempts: ${variant.attempts}</p></td>`;
     }).join('');
     return `<tr><th>${row + 1}. ${escapeHtml(style.label)}</th>${cells}</tr>`;
   }).join('\n');
   const headers = dates.map(({ date, label }) => `<th>${escapeHtml(label)}<br>${date}</th>`).join('');
-  return `<!doctype html><meta charset="utf-8"><title>Eink aesthetic study</title><style>body{font:15px -apple-system,sans-serif;margin:24px;background:#eee;color:#111}h1{margin:0 0 8px}p{color:#555}table{border-collapse:collapse;width:100%;background:white}th,td{border:1px solid #ccc;padding:10px;vertical-align:top}th{background:#fafafa}img{display:block;width:100%;margin-bottom:8px}td p{margin:0}tr>th:first-child{width:180px}</style><h1>Eink aesthetic study</h1><p>Each cell: full-color original, then exact six-color display preview. Same style is tested across both dates.</p><table><thead><tr><th>Direction</th>${headers}</tr></thead><tbody>${rows}</tbody></table>`;
+  return `<!doctype html><meta charset="utf-8"><title>Eink aesthetic study</title><style>body{font:15px -apple-system,sans-serif;margin:24px;background:#eee;color:#111}h1{margin:0 0 8px}p{color:#555}table{border-collapse:collapse;width:100%;background:white}th,td{border:1px solid #ccc;padding:10px;vertical-align:top}th{background:#fafafa}img{display:block;width:100%;margin-bottom:8px}td p{margin:0}tr>th:first-child{width:180px}</style><h1>Eink aesthetic study</h1><p>Each cell is the exact six-color display preview. Same style is tested across both dates.</p><table><thead><tr><th>Direction</th>${headers}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 export async function rebuildStyleStudy(root: string): Promise<void> {
@@ -198,10 +197,7 @@ export async function rebuildStyleStudy(root: string): Promise<void> {
     styles: StyleDirection[];
     variants: StudyVariant[];
   };
-  await Promise.all([
-    contactSheet(root, 'originals-contact-sheet.png', study.dates, study.variants, study.styles, 'original.png'),
-    contactSheet(root, 'eink-contact-sheet.png', study.dates, study.variants, study.styles, 'display-preview.png'),
-  ]);
+  await contactSheet(root, 'eink-contact-sheet.png', study.dates, study.variants, study.styles);
 }
 
 export async function runStyleStudy(config: AppConfig, round = 1): Promise<{ root: string; variants: StudyVariant[] }> {
@@ -246,9 +242,16 @@ export async function runStyleStudy(config: AppConfig, round = 1): Promise<{ roo
         const variantDirectory = path.join(root, `${String(index).padStart(2, '0')}-${candidate.label.toLowerCase()}-${style.id}-${randomUUID().slice(0, 6)}-a${attempt}`);
         try {
           const artwork = await generateArtwork(config, brief, correction, style.direction);
-          const rendered = await renderArtwork(artwork.bytes, variantDirectory);
+          const rendered = await renderArtwork(artwork.bytes);
           const qa = await inspectArtwork(config, rendered.original, rendered.preview, qaDirection, brief);
-          await atomicWrite(path.join(variantDirectory, 'qa.json'), `${JSON.stringify(qa, null, 2)}\n`);
+          if (qa.pass || attempt === 3) {
+            await ensureDirectory(variantDirectory);
+            await Promise.all([
+              atomicWrite(path.join(variantDirectory, 'display-preview.png'), rendered.preview),
+              atomicWrite(path.join(variantDirectory, 'display.bmp'), rendered.bmp),
+              atomicWrite(path.join(variantDirectory, 'qa.json'), `${JSON.stringify(qa, null, 2)}\n`),
+            ]);
+          }
           finalQa = qa;
           finalDirectory = variantDirectory;
           if (qa.pass) break;
@@ -277,8 +280,7 @@ export async function runStyleStudy(config: AppConfig, round = 1): Promise<{ roo
   }
 
   await Promise.all([
-    contactSheet(root, 'originals-contact-sheet.png', dates, variants, styles, 'original.png'),
-    contactSheet(root, 'eink-contact-sheet.png', dates, variants, styles, 'display-preview.png'),
+    contactSheet(root, 'eink-contact-sheet.png', dates, variants, styles),
     atomicWrite(path.join(root, 'study.json'), `${JSON.stringify({ createdAt: new Date().toISOString(), round, dates, styles, variants }, null, 2)}\n`),
     atomicWrite(path.join(root, 'index.html'), studyHtml(dates, variants, styles)),
   ]);

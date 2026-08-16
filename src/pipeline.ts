@@ -4,7 +4,7 @@ import { hash } from './hash.js';
 import { fetchTodayEvents } from './calendar.js';
 import { fetchWeather } from './weather.js';
 import { createBrief, generateArtwork, inspectArtwork } from './ai.js';
-import { loadState, promoteLatest, recentBriefs, recordFailure, runDirectory, saveManifest, saveState } from './archive.js';
+import { loadEdition, loadState, promoteLatest, recentBriefs, recordFailure, saveCandidate, saveEdition, saveState } from './archive.js';
 import { renderArtwork } from './render.js';
 import { uploadBmp } from './display.js';
 import { log, pruneLogs } from './logger.js';
@@ -31,6 +31,19 @@ export async function runPipeline(config: AppConfig, options: RunOptions): Promi
   await log('info', 'run_started', { editionDate, mode: options.mode, upload: options.upload });
   try {
     await pruneLogs();
+    if (!options.force && options.mode === 'daily' && options.upload) {
+      const existing = await loadEdition(editionDate);
+      if (existing) {
+        if (!existing.manifest.uploadVerified) {
+          const receipt = await uploadBmp(config, existing.bmp);
+          existing.manifest.uploadedAt = receipt.verifiedAt;
+          existing.manifest.uploadVerified = true;
+        }
+        await promoteLatest(existing.manifest, existing.png, existing.bmp);
+        await log('info', 'daily_edition_reused', { editionDate, runId: existing.manifest.runId });
+        return existing.manifest;
+      }
+    }
     const [events, weather, history] = await Promise.all([
       fetchTodayEvents(config, editionNow),
       fetchWeather(config, editionDate),
@@ -49,12 +62,11 @@ export async function runPipeline(config: AppConfig, options: RunOptions): Promi
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       const runId = `${Date.now()}-${randomUUID().slice(0, 8)}-a${attempt}`;
-      const directory = runDirectory(editionDate, runId);
       const artwork = await generateArtwork(config, brief, correction);
-      const rendered = await renderArtwork(artwork.bytes, directory);
+      const rendered = await renderArtwork(artwork.bytes);
       const qa = await inspectArtwork(config, rendered.original, rendered.preview, undefined, brief);
       const manifest: EditionManifest = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         editionDate,
         runId,
         generatedAt: new Date().toISOString(),
@@ -63,12 +75,8 @@ export async function runPipeline(config: AppConfig, options: RunOptions): Promi
         model: config.models.image,
         brief,
         qa,
-        originalFile: rendered.originalFile,
-        previewFile: rendered.previewFile,
-        bmpFile: rendered.bmpFile,
         rejected: !qa.pass,
       };
-      await saveManifest(manifest);
       if (!qa.pass) {
         await log('warn', 'artwork_rejected', { editionDate, runId, attempt, reasonCount: qa.reasons.length });
         correction = qa.correction || qa.reasons.join('; ');
@@ -77,11 +85,13 @@ export async function runPipeline(config: AppConfig, options: RunOptions): Promi
       }
 
       if (options.upload) {
+        await saveEdition(manifest, rendered.preview, rendered.bmp);
         const receipt = await uploadBmp(config, rendered.bmp);
         manifest.uploadedAt = receipt.verifiedAt;
         manifest.uploadVerified = true;
-        await saveManifest(manifest);
-        await promoteLatest(manifest);
+        await promoteLatest(manifest, rendered.preview, rendered.bmp);
+      } else {
+        await saveCandidate(manifest, rendered.preview, rendered.bmp);
       }
       finalManifest = manifest;
       break;
