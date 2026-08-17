@@ -9,7 +9,7 @@ enum ReaderError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .usage:
-            return "Usage: eink-calendar-reader authorize | list-calendars | events <start-iso8601> <end-iso8601>"
+            return "Usage: eink-calendar-reader authorize | list-calendars | events <start-iso8601> <end-iso8601> | run-pipeline <node> <cli> <args...>"
         case .calendarAccessRequired:
             return "Calendar full access is required. Run: eink-calendar-reader authorize"
         case .invalidDate(let value):
@@ -83,6 +83,17 @@ struct EinkCalendarReader {
             let store = EKEventStore()
 
             switch command {
+            case "run-pipeline":
+                guard arguments.count >= 4 else { throw ReaderError.usage }
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: arguments[1])
+                process.arguments = Array(arguments.dropFirst(2))
+                process.standardOutput = FileHandle.standardOutput
+                process.standardError = FileHandle.standardError
+                try process.run()
+                process.waitUntilExit()
+                Foundation.exit(process.terminationStatus)
+
             case "authorize":
                 if EKEventStore.authorizationStatus(for: .event) != .fullAccess {
                     let granted = try await store.requestFullAccessToEvents()

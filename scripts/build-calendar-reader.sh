@@ -4,10 +4,12 @@ set -euo pipefail
 repo_root="${0:A:h:h}"
 source_file="$repo_root/native/calendar-reader/main.swift"
 info_plist="$repo_root/native/calendar-reader/Info.plist"
-output="$repo_root/bin/eink-calendar-reader"
+app="$repo_root/bin/Eink Calendar Reader.app"
+output="$app/Contents/MacOS/eink-calendar-reader"
 module_cache="${TMPDIR:-/private/tmp}/eink-wallpaper-swift-module-cache"
 
-mkdir -p "$repo_root/bin" "$module_cache"
+mkdir -p "$app/Contents/MacOS" "$module_cache"
+cp "$info_plist" "$app/Contents/Info.plist"
 xcrun swiftc \
   -parse-as-library \
   -module-cache-path "$module_cache" \
@@ -18,6 +20,6 @@ xcrun swiftc \
   -Xlinker "$info_plist" \
   "$source_file" \
   -o "$output"
-codesign --force --sign - --identifier com.phamous.eink-wallpaper.calendar-reader "$output"
+codesign --force --sign - --identifier com.phamous.eink-wallpaper.calendar-reader "$app"
 echo "Built $output"
 echo "Calendar authorization must be renewed after rebuilding: eink-wallpaper authorize local"

@@ -11,7 +11,8 @@ import type { AccountName, AppConfig, NormalizedEvent } from './types.js';
 
 const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 const execFileAsync = promisify(execFile);
-const eventKitReader = fileURLToPath(new URL('../bin/eink-calendar-reader', import.meta.url));
+const eventKitReaderApp = fileURLToPath(new URL('../bin/Eink Calendar Reader.app', import.meta.url));
+const eventKitReader = fileURLToPath(new URL('../bin/Eink Calendar Reader.app/Contents/MacOS/eink-calendar-reader', import.meta.url));
 
 function tokenKey(account: AccountName): string {
   return `google-oauth-token-${account}`;
@@ -81,13 +82,14 @@ export async function authorizeCalendar(config: AppConfig, account: AccountName)
 
 export async function authorizeLocalCalendar(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(eventKitReader, ['authorize'], { stdio: 'inherit' });
+    const child = spawn('/usr/bin/open', ['-W', '-n', eventKitReaderApp, '--args', 'authorize'], { stdio: 'inherit' });
     child.on('error', reject);
     child.on('close', (code) => {
       if (code === 0) resolve();
       else reject(new Error(`EventKit authorization exited ${code}`));
     });
   });
+  await execFileAsync(eventKitReader, ['list-calendars']);
 }
 
 async function calendarClient(config: AppConfig, account: AccountName): Promise<calendar_v3.Calendar> {

@@ -10,6 +10,8 @@
   <string>eink-calendar-reader</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+  <key>LSUIElement</key>
+  <true/>
   <key>NSCalendarsFullAccessUsageDescription</key>
   <string>Create a private daily artwork from events already available in Calendar on this Mac.</string>
 </dict>

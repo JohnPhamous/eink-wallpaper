@@ -37,6 +37,10 @@ function executableEntry(): string {
   return entry;
 }
 
+function calendarReaderEntry(): string {
+  return fileURLToPath(new URL('../bin/Eink Calendar Reader.app/Contents/MacOS/eink-calendar-reader', import.meta.url));
+}
+
 export async function installLaunchAgent(config: AppConfig): Promise<void> {
   await ensureDirectory(path.dirname(paths.launchAgent));
   await ensureDirectory(paths.logs);
@@ -47,6 +51,8 @@ export async function installLaunchAgent(config: AppConfig): Promise<void> {
   <key>Label</key><string>${LABEL}</string>
   <key>ProgramArguments</key>
   <array>
+    <string>${xml(calendarReaderEntry())}</string>
+    <string>run-pipeline</string>
     <string>${xml(process.execPath)}</string>
     <string>${xml(executableEntry())}</string>
     <string>run</string>
