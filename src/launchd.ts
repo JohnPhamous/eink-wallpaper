@@ -41,6 +41,14 @@ function calendarReaderEntry(): string {
   return fileURLToPath(new URL('../bin/Eink Calendar Reader.app/Contents/MacOS/eink-calendar-reader', import.meta.url));
 }
 
+function calendarIntervals(config: AppConfig): string {
+  return [0, 2, 4].map((offset) => `
+  <dict>
+    <key>Hour</key><integer>${(config.schedule.hour + offset) % 24}</integer>
+    <key>Minute</key><integer>${config.schedule.minute}</integer>
+  </dict>`).join('');
+}
+
 export async function installLaunchAgent(config: AppConfig): Promise<void> {
   await ensureDirectory(path.dirname(paths.launchAgent));
   await ensureDirectory(paths.logs);
@@ -59,10 +67,8 @@ export async function installLaunchAgent(config: AppConfig): Promise<void> {
     <string>--scheduled</string>
   </array>
   <key>StartCalendarInterval</key>
-  <dict>
-    <key>Hour</key><integer>${config.schedule.hour}</integer>
-    <key>Minute</key><integer>${config.schedule.minute}</integer>
-  </dict>
+  <array>${calendarIntervals(config)}
+  </array>
   <key>ProcessType</key><string>Background</string>
   <key>LowPriorityIO</key><true/>
   <key>StandardOutPath</key><string>${xml(path.join(paths.logs, 'launchd.out.log'))}</string>

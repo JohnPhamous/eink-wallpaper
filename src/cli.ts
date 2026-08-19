@@ -341,7 +341,7 @@ program
 
 program
   .command('install-agent')
-  .description('Install the 5:30am per-user LaunchAgent')
+  .description('Install the per-user LaunchAgent with same-morning retry slots')
   .action(async () => {
     const config = await loadConfig();
     await fetchTodayEvents(config);

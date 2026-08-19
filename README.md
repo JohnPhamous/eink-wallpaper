@@ -2,7 +2,7 @@
 
 A private, text-free daily artwork for a powered Waveshare ESP32-S3 PhotoPainter. It reads the calendars already connected to macOS Calendar plus Seattle weather, asks an LLM to art-direct the day, generates one bichon-led scene, converts it to the display’s native six-color format, and pushes it over the local network.
 
-No Glanceboard, server, custom firmware, Swift helper, or macOS app is involved. One TypeScript CLI runs from a per-user LaunchAgent at 5:30am.
+No Glanceboard, server, or custom firmware is involved. A TypeScript CLI and a minimal invisible EventKit helper app run from a per-user LaunchAgent at 5:30am, with no-op recovery slots at 7:30am and 9:30am.
 
 ## What it produces
 
